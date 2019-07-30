@@ -1,0 +1,5 @@
+*.pyc
+*.stl
+temp*
+*.zip
+
