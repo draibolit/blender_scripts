@@ -1,0 +1,2 @@
+numpy==1.17.0
+fake-bpy-module-2.80

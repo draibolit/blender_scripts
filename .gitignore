@@ -2,4 +2,5 @@
 *.stl
 temp*
 *.zip
+pythonenv/
 
