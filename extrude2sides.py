@@ -12,7 +12,9 @@ def skip(f):
     return
 
 def newobj(name, location, vertices, edge, polygons):
-
+    '''
+    create obj base on local vertice coordination
+    '''
     #set mesh name and objname the same
     newmesh = bpy.data.meshes.new(name) 
     newobject = bpy.data.objects.new(name, newmesh)
@@ -20,18 +22,20 @@ def newobj(name, location, vertices, edge, polygons):
     newobject.location = location 
     bpy.context.scene.collection.objects.link(newobject)
     # create mesh from python data
-    #newmesh.from_pydata(vertices, edge, polygons.tolist())
     newmesh.from_pydata(vertices, edge, polygons)
     newmesh.update(calc_edges=True)
     return newobject
 
-def getFaceNormals(vertices, facets):
+def getFaceNormals(vertices, pols):
     """ 
     Returns normals for each facet of mesh 
     Assuming right hand rule
+    Require: pols has to be numpy array --> Need to generalize to polygons with
+    diffferent number of vertices
     """
-    u = vertices[facets[:,1],:] - vertices[facets[:,0],:]
-    v = vertices[facets[:,2],:] - vertices[facets[:,0],:]
+    pols = np.array(pols)
+    u = vertices[pols[:,1],:] - vertices[pols[:,0],:]
+    v = vertices[pols[:,2],:] - vertices[pols[:,0],:]
     normals = np.cross(u,v)
     norms = np.sqrt(np.sum(normals*normals, axis=1))
     return normals/norms[:, np.newaxis]
@@ -39,9 +43,8 @@ def getFaceNormals(vertices, facets):
 def getVertNormals(polygons, faceNorms):
     """ 
     Returns normals for each verts of mesh 
-    based on norms of facets
+    based on norms of pols
     """
-
     normVectors = [] #[verticeNO, meansNOrm[n,3]numpyarray]
     for count, pol in enumerate(polygons):
         if count == 0:
@@ -57,9 +60,7 @@ def getVertNormals(polygons, faceNorms):
                         [normVectors[idx][1], faceNorms[count]])
                 else:
                     normVectors.append([ver, faceNorms[count]])
-
     normVectors = sorted(normVectors)
-    #print(normVectors)
 
     #mean all normal vectors
     meanarray = []
@@ -68,15 +69,23 @@ def getVertNormals(polygons, faceNorms):
         if norm.ndim == 2:
             norm = np.mean(norm, axis=0) #some has 1 dim
         meanarray.append(norm)
-    return meanarray
+    return np.array(meanarray)
 
-def getobjdata(obj):
+def to_global(matrix_world, local_coords):
+#https://blender.stackexchange.com/questions/6155/how-to-convert-coordinates-from-vertex-to-world-space
+    #add an extra column of one
+    local_coords = np.c_[local_coords, np.ones(local_coords.shape[0])]
+    global_coords = np.dot(matrix_world, local_coords.T)[0:3].T
+    return global_coords
+
+def getobjdata(obj, glo):
     '''
     get vertice coords and polygons of obj
+    default is in local coord system
+    if glo=True -> export vertices in global coord system 
     '''
     #get active object
     objname = obj.name
-    print("objname: ",objname)
     objdata = bpy.data.meshes[objname]
     objlocation = bpy.data.objects[objname].location
     #get matrix of polygon and vertices coords
@@ -84,79 +93,97 @@ def getobjdata(obj):
     polygons=[]
     for ver in objdata.vertices:
         vertices.append(ver.co)
+    vertices = np.array(vertices)
     for pol in objdata.polygons:
         vertindex_list=[]
         for verNo in range(0, len(pol.vertices)):
             vertindex_list.append(pol.vertices[verNo])
         polygons.append(vertindex_list)
-    return vertices, polygons, objlocation #return list 
+    if glo==True:
+#https://b3d.interplanety.org/en/how-to-get-global-vertex-coordinates/
+        #vertices = obj.matrix_world @ vertices
+        vertices = to_global(obj.matrix_world, vertices)
+        #print(vertices)
 
-
-objdict['object1'] = bpy.context.active_object
-
-vertices, polygons, objlocation = getobjdata(objdict['object1'])
-vertices = np.array(vertices)
-polygons = np.array(polygons)
-
-faceNorms = getFaceNormals(vertices, polygons) #normal vector for faces
-verNorms = getVertNormals(polygons, faceNorms) 
-#print(faceNorms)
-#print(verNorms) # list of numpy array --> need to fix 
-#print(vertices)
-
-new_vertices=np.zeros((len(vertices),3))
-#print(type(vertices), len(vertices), type(verNorms), len(verNorms))
-#print(vertices)
-for i in range (0, len(vertices)):
-    new_vertices[i] = vertices[i] + verNorms[i] 
-print(new_vertices)
-
-#objdict['verplane'] = newobj("verplane", objlocation, new_vertices,
-                                   #[], [])
-#objdict['object2'] = newobj("object2", objlocation, new_vertices, [], polygons)
-#objdict['object2'] = newobj("object2", [], new_vertices, [], polygons)
+    return vertices, polygons, objlocation #return nparray, list, list 
 
 
 
-def checknorm1(vertices, new_vertices):
-    #draw arrow to check norm vector of vertices : 
-    arr_vertices = np.vstack([vertices, new_vertices])
-    print("arr_vertices:",arr_vertices)
+
+
+def drawsemiArrows(name, location, originVerts, endVerts):
+    '''
+    draw semi arrow (edges) from 2 arrays of begin and end Verts 
+    '''
+    arr_vertices = np.vstack([originVerts, endVerts])
     arr_edge = [] 
-    no_ver = len(vertices)
+    no_ver = len(originVerts)
     for c in range(0, no_ver):
         arr_edge.append([c, no_ver + c])
-    #print(arr_edge)
-    objdict['normarrows'] = newobj("normarrows2", objlocation, arr_vertices,
+    objdict[name] = newobj(name, location, arr_vertices,
                                    arr_edge, [])
     return
-#checknorm1(vertices, new_vertices)
 
-def checknorm2(vertices, faceNorms):
+
+def drawsemiArrowsPol(name, location, vertices, polygons):
+    '''
+    draw arrows from middle of pols along their norm vectors
+    '''
     #draw arrow to check norm vector of pol:
     middleVertices = np.zeros((len(polygons),3))
-
+    faceNorms = getFaceNormals(vertices, polygons) 
     for count, pol in enumerate(polygons):
         polvertices = []
         for ver in pol:
             polvertices.append(vertices[ver])
         polvertice = np.array(polvertices)
         middleVer = np.mean(polvertices, axis=0)
-        print(type(middleVer), middleVer)
         middleVertices[count] = middleVer
 
     new_vertices = middleVertices + faceNorms
-    print(new_vertices)
-    arr_vertices = np.vstack([middleVertices, new_vertices])
-    arr_edge = [] 
-    no_pol = len(polygons)
-    for c in range(0, no_pol):
-        arr_edge.append([c, no_pol + c])
-    objdict['normFacearrows'] = newobj("normFacearrows", objlocation, arr_vertices,
-                                   arr_edge, [])
-    return
-checknorm2(vertices, faceNorms)
+    obj = drawsemiArrows(name, location, middleVertices, new_vertices)
 
+    return obj
+
+
+def drawsemiArrowsVer(name, location, vertices, polygons):
+    '''
+    draw arrows from extruding vertices along their mean norm vectors
+    which calculated from norm vector of surrounding faces
+    '''
+
+    faceNorms = getFaceNormals(vertices, polygons) #normal vector for faces
+    verNorms = getVertNormals(polygons, faceNorms) 
+
+    new_vertices=np.zeros((len(vertices),3))
+    for i in range (0, len(vertices)):
+        new_vertices[i] = vertices[i] + verNorms[i] 
+
+    obj = drawsemiArrows(name, location, vertices, new_vertices)
+
+    return obj
+
+def extrudeVertsToplane(name, fromobj, magnitude ):
+    '''
+    create new object by extruding vertices along their norm vector of vertices
+    '''
+    vertices, polygons, location = getobjdata(fromobj, glo=False)
+    faceNorms = getFaceNormals(vertices, polygons) #normal vector for faces
+    verNorms = getVertNormals(polygons, faceNorms) 
+    new_vertices = vertices + verNorms*magnitude
+    obj = newobj(name, location, new_vertices, [], polygons)
+    return obj
+
+
+objdict['actObj'] = bpy.context.active_object
+vertices, polygons, objlocation = getobjdata(objdict['actObj'], glo=False)
+objdict["normsVerArr"] = drawsemiArrowsVer("normsVerArr", objlocation, vertices, polygons)
+objdict["normVerPlane"] = extrudeVertsToplane("normVerPlane",
+                                              objdict['actObj'], 0.2)
+objdict["normVerPlane"] = extrudeVertsToplane("normVerPlane",
+                                              objdict['actObj'], -0.2)
+
+#objdict["normsPolArr"] = drawsemiArrowsPol("normsPol", objlocation, vertices, polygons)
 print(objdict)
 
 #Refs

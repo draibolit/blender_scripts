@@ -1,3 +1,0 @@
-simpletransform.py simplifiy the transformations modules
-display_mesh_and_arrow.py Display volumn mesh and arrow in blender. Import using model.dat file from Marc.\nOnly be able to use with mesh not equivalent function.\n\nversion using with element 134,7Â
-transformations.py Version: 2017.02.17\nImprove speedÂ
