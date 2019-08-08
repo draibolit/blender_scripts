@@ -3,7 +3,7 @@ bl_info = {
     "name": "Dental Model Alignment",
     "author": "Tuan Nguyen - Nagasaki University",
     "version": (0, 1),
-    "blender": (2, 6, 9),
+    "blender": (2, 80, 0),
     "location": "View3D > Toos > Alignment",
     "description": "To align 2 scanning models",
     "warning": "",
@@ -37,43 +37,43 @@ class AlignmentAddonPreferences(AddonPreferences):  #store preferences permenent
     # when defining this in a submodule of a python package.
     bl_idname = __name__
 
-    icp_iterations = IntProperty(
+    icp_iterations : IntProperty(
             name="ICP Iterations",
             default=50
             )
     
-    redraw_frequency = IntProperty(
+    redraw_frequency : IntProperty(
             name="Redraw Iterations",
             description = "Number of iterations between redraw, bigger = less redraw but faster completion",
             default=10)
     
-    use_sample = BoolProperty(
+    use_sample : BoolProperty(
             name = "Use Sample",
             description = "Use a sample of verts to align",
             default = False)
     
-    sample_fraction = FloatProperty(
+    sample_fraction : FloatProperty(
             name="Sample Fraction",
             description = "Only fraction of mesh verts for alignment. Less accurate, faster",
             default = 0.5,
             min = 0,
             max = 1)
     
-    min_start = FloatProperty(
+    min_start : FloatProperty(
             name="Minimum Starting Dist",
             description = "Only verts closer than this distance will be used in each iteration",
             default = 0.5,
             min = 0,
             max = 20)
     
-    target_d = FloatProperty(
+    target_d : FloatProperty(
             name="Target Translation",
             description = "If translation of 3 iterations is < target, ICP is considered sucessful",
             default = 0.01,
             min = 0,
             max = 10)
     
-    use_target = BoolProperty(
+    use_target : BoolProperty(
             name="Use Target",
             description = "Calc alignment stats at each iteration to assess convergence. SLower per step, may result in less steps",
             default = False)
@@ -82,7 +82,7 @@ class AlignmentAddonPreferences(AddonPreferences):  #store preferences permenent
     align_items = []
     for index, item in enumerate(align_methods):
         align_items.append((str(index), align_methods[index], str(index)))
-    align_meth = EnumProperty(items = align_items, name="Alignment Method", description="Changes how picked points registration aligns object", default='0', options={'ANIMATABLE'}, update=None, get=None, set=None)
+        align_meth : EnumProperty(items = align_items, name="Alignment Method", description="Changes how picked points registration aligns object", default='0', options={'ANIMATABLE'}, update=None, get=None, set=None)
 
     def draw(self, context):
         layout = self.layout
@@ -95,12 +95,13 @@ class AlignmentAddonPreferences(AddonPreferences):  #store preferences permenent
         layout.prop(self, "use_target")
         layout.prop(self, "target_d")
         layout.prop(self, "align_meth")
-        layout.prop(self, "align_areas")
+        #layout.prop(self, "align_areas")
         
-class ComplexAlignmentPanel(bpy.types.Panel): 
+#class ComplexAlignmentPanel(bpy.types.Panel): 
+class OBJECT_PT_ComplexAlignmentPanel(bpy.types.Panel): 
     """UI for ICP Alignment"""
     #bl_category = "Alignment"
-    bl_label = "ICP Object Alignment"
+    bl_label = "OBJECT_PT_ICP_Object_Alignment"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
 
@@ -190,7 +191,7 @@ class MyPropertyGroup(bpy.types.PropertyGroup):
         default = "Palate"
       )
 
-class Area_selection(bpy.types.Operator): # Create select area in a separate group
+class OBJECT_OT_Area_selection(bpy.types.Operator): # Create select area in a separate group
     bl_idname = "object.area_selection"
     bl_label = "Area Selection/Finish"
     bl_options = {'REGISTER', 'UNDO'}
@@ -718,21 +719,11 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-def register():
-    bpy.utils.register_class(AlignmentAddonPreferences)
-    bpy.utils.register_class(OJECT_OT_icp_align)
-    bpy.utils.register_class(OBJECT_OT_align_pick_points)
-    bpy.utils.register_class(ComplexAlignmentPanel)
-    bpy.utils.register_class(Area_selection)
-    bpy.utils.register_class(MyPropertyGroup)
+classes = (AlignmentAddonPreferences, OJECT_OT_icp_align,
+           OBJECT_OT_align_pick_points, OBJECT_PT_ComplexAlignmentPanel,
+           OBJECT_OT_Area_selection, MyPropertyGroup) 
 
-def unregister():
-    bpy.utils.unregister_class(AlignmentAddonPreferences)
-    bpy.utils.unregister_class(OJECT_OT_icp_align)
-    bpy.utils.unregister_class(OBJECT_OT_align_pick_points)
-    bpy.utils.unregister_class(ComplexAlignmentPanel)
-    bpy.utils.unregister_class(Area_selection)
-
+register, unregister = bpy.utils.register_classes_factory(classes)
 
 if __name__ == "__main__":
     register()

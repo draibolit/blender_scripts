@@ -5,6 +5,6 @@ temp*
 pythonenv/
 *.blend
 *.swp
-.ion
+descript*
 test*
 tags

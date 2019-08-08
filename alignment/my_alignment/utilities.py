@@ -20,7 +20,8 @@ mylist = []
 
 def get_settings():
     if not get_settings.cached_settings:
-        addons = bpy.context.user_preferences.addons
+        addons = bpy.context.preferences.addons
+        #addons = bpy.context.user_preferences.addons
         #frame = inspect.currentframe()
         #frame.f_code.co_filename
         folderpath = os.path.dirname(os.path.abspath(__file__))
