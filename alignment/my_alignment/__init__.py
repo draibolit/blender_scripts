@@ -103,7 +103,7 @@ class OBJECT_PT_ComplexAlignmentPanel(bpy.types.Panel):
     #bl_category = "Alignment"
     bl_label = "OBJECT_PT_ICP_Object_Alignment"
     bl_space_type = 'VIEW_3D'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
 
 
     def draw(self, context):
@@ -199,7 +199,7 @@ class OBJECT_OT_Area_selection(bpy.types.Operator): # Create select area in a se
 
     @classmethod
     def poll(cls, context):
-        condition_1 = context.object.type == 'MESH'
+        condition_1 = context.selected_objects[0].type == 'MESH'
         return condition_1
 
 
@@ -229,7 +229,8 @@ class OJECT_OT_icp_align(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         condition_1 = len(context.selected_objects) == 2
-        condition_2 = context.object.type == 'MESH'
+        condition_2 = context.selected_objects[0].type == 'MESH' and \
+                        context.selected_objects[0].type == 'MESH'
         return condition_1 and condition_2
 
     def execute(self, context):
@@ -430,7 +431,8 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         condition_1 = len(context.selected_objects) == 2
-        condition_2 = context.object.type == 'MESH'
+        condition_2 =  context.selected_objects[0].type == 'MESH' and \
+                       context.selected_objects[1].type == 'MESH'
         return condition_1 and condition_2
 
     def modal(self, context, event):
@@ -651,13 +653,14 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         self.base_msg = 'Select 3 or more points'
         self.align_msg = 'Select 3 or more points'
         
-        obj1_name = context.object.name
-        obj2_name = [obj for obj in context.selected_objects if obj != context.object][0].name
+        obj1_name = context.selected_objects[0].name
+        obj2_name = [obj for obj in context.selected_objects if obj != \
+                     context.selected_objects][0].name
         
-        for ob in context.scene.objects:
-            ob.select = False
+        for ob in context.scene.collection.objects:
+            ob.select_set(status=False)
         
-        context.scene.objects.active = None
+        context.view_layer.objects.active = None
         
         #I did this stupid method becuase I was unsure
         #if some things were being "sticky" and not
@@ -666,7 +669,7 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         obj2 = bpy.data.objects[obj2_name]
         
         for ob in bpy.data.objects:
-            if ob.select:
+            if ob.select_get():
                 print(ob.name)
                 
         screen = context.window.screen
@@ -675,31 +678,33 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
             if area.type == 'VIEW_3D':
                 break 
         
-        bpy.ops.view3d.toolshelf() #close the first toolshelf               
+        #bpy.ops.view3d.toolshelf() #close the first toolshelf, not aval in 2.8
         override = context.copy()
         override['area'] = area
         
         self.area_align = area
         
-        bpy.ops.screen.area_split(override, direction='VERTICAL', factor=0.5, mouse_x=-100, mouse_y=-100)
+        #bpy.ops.screen.area_split(override, direction='VERTICAL', factor=0.5, mouse_x=-100, mouse_y=-100)
+        bpy.ops.screen.area_split(override, direction='VERTICAL', factor=0.5,
+                                  cursor=(0, 0))
         #bpy.ops.view3d.toolshelf() #close the 2nd toolshelf
         
-        context.scene.objects.active = obj1
-        obj1.select = True
-        obj2.select = False
+        context.view_layer.objects.active = obj1
+        obj1.select_set(state=True)
+        obj2.select_set(state= False)
         
         bpy.ops.view3d.localview(override)
         
-        obj1.select = False
-        context.scene.objects.active = None
+        obj1.select_set(state=False)
+        context.view_layer.objects.active = None
         override = context.copy()
         for area in screen.areas:
             if area.as_pointer() not in areas:
                 override['area'] = area
                 self.area_base = area
                 bpy.ops.object.select_all(action = 'DESELECT')
-                context.scene.objects.active = obj2
-                obj2.select = True
+                context.view_layer.objects.active = obj2
+                obj2.select_set(state=True)
                 override['selected_objects'] = [obj2]
                 override['selected_editable_objects'] = [obj2]
                 override['object'] = obj2
@@ -719,11 +724,18 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-classes = (AlignmentAddonPreferences, OJECT_OT_icp_align,
-           OBJECT_OT_align_pick_points, OBJECT_PT_ComplexAlignmentPanel,
-           OBJECT_OT_Area_selection, MyPropertyGroup) 
+classes = (AlignmentAddonPreferences, 
+           OJECT_OT_icp_align,
+           OBJECT_OT_align_pick_points, 
+           OBJECT_PT_ComplexAlignmentPanel,
+           OBJECT_OT_Area_selection, 
+           MyPropertyGroup) 
 
 register, unregister = bpy.utils.register_classes_factory(classes)
 
 if __name__ == "__main__":
     register()
+
+#command to add to running addon:
+#cp /mnt/linuxdisk/Dropbox/Tuan/Patran/skullremodelling/blenderscripts/alignment/my_alignment/__init__.py ~/.config/blender/2.80/scripts/addons/my_alignment/
+#https://b3d.interplanety.org/en/porting-add-on-from-blender-2-7-to-blender-2-8/
