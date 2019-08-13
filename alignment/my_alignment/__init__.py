@@ -13,11 +13,11 @@ bl_info = {
 
 import numpy as np
 from numpy.ma.core import fmod
-import math
+#import math
 import time
 import bpy
 import blf #This module provides access to blenders text drawing functions.
-import bgl #The Blender.BGL submodule (the OpenGL wrapper).
+#import bgl #The Blender.BGL submodule (the OpenGL wrapper).
 from bpy.types import Operator
 from bpy.props import FloatVectorProperty, StringProperty, IntProperty, BoolProperty, FloatProperty, EnumProperty
 from bpy.types import Operator, AddonPreferences
@@ -199,9 +199,12 @@ class OBJECT_OT_Area_selection(bpy.types.Operator): # Create select area in a se
 
     @classmethod
     def poll(cls, context):
-        condition_1 = context.selected_objects[0].type == 'MESH'
+        condition_1 = False 
+        no_seleted = len(context.selected_objects)
+        initial_condition = (no_seleted >= 1)
+        if initial_condition == True:
+            condition_1 = (context.selected_objects[0].type == 'MESH')
         return condition_1
-
 
 
     def execute(self, context):
@@ -228,9 +231,12 @@ class OJECT_OT_icp_align(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        condition_1 = len(context.selected_objects) == 2
-        condition_2 = context.selected_objects[0].type == 'MESH' and \
-                        context.selected_objects[0].type == 'MESH'
+        no_seleted = len(context.selected_objects)
+        condition_1 = (no_seleted == 2)
+        condition_2 = False 
+        if condition_1 == True:
+            condition_2 = context.selected_objects[0].type == 'MESH' and \
+                        context.selected_objects[1].type == 'MESH'
         return condition_1 and condition_2
 
     def execute(self, context):
@@ -410,11 +416,11 @@ def draw_callback_px(self, context):
         
     if context.area.x == self.area_align.x:
         blf.draw(font_id, "Align: "+ self.align_msg)
-        points = [self.obj_align.matrix_world * p for p in self.align_points]
+        points = [self.obj_align.matrix_world @ p for p in self.align_points]
         color = (1,0,0,1)
     else:
         blf.draw(font_id, "Base: " + self.base_msg)
-        points = [self.obj_align.matrix_world * p for p in self.base_points]
+        points = [self.obj_base.matrix_world @ p for p in self.base_points]
         color = (0,1,0,1)
     
     draw_3d_points_revised(context, points, color, 4)
@@ -424,15 +430,21 @@ def draw_callback_px(self, context):
         draw_3d_text(context, font_id, ind, vec)
     
 class OBJECT_OT_align_pick_points(bpy.types.Operator):
-    """Algin two objects with 3 or more pair of picked poitns"""
+    """
+    Algin two objects with 3 or more pair of picked poitns
+    """
     bl_idname = "object.align_picked_points"
     bl_label = "Align: Picked Points"
 
     @classmethod
     def poll(cls, context):
-        condition_1 = len(context.selected_objects) == 2
-        condition_2 =  context.selected_objects[0].type == 'MESH' and \
-                       context.selected_objects[1].type == 'MESH'
+
+        no_seleted = len(context.selected_objects)
+        condition_1 = (no_seleted == 2)
+        condition_2 = False 
+        if condition_1 == True:
+            condition_2 = context.selected_objects[0].type == 'MESH' and \
+                        context.selected_objects[1].type == 'MESH'
         return condition_1 and condition_2
 
     def modal(self, context, event):
@@ -511,8 +523,8 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
                 if ok:
                     print('hit! base_obj %s' % self.obj_base.name)
                     #points in local space of align object
-                    self.base_points.append(self.obj_align.matrix_world.inverted() * self.obj_base.matrix_world * hit)    
-            
+                    self.base_points.append(self.obj_align.matrix_world.inverted()
+                                            @ self.obj_base.matrix_world @ hit)
                     
             return {'RUNNING_MODAL'}
             
@@ -593,7 +605,7 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         
         #Crash Blender?       
         bpy.ops.screen.area_join(min_x=self.area_align.x,min_y=self.area_align.y, max_x=self.area_base.x, max_y=self.area_base.y)
-        bpy.ops.view3d.toolshelf()
+        #bpy.ops.view3d.toolshelf()
         
         #ret = bpy.ops.screen.area_join(min_x=area_base.x,min_y=area_base.y, max_x=area_align.x, max_y=area_align.y)
     
@@ -634,12 +646,17 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
 
         #because we calced transform in local space
         #it's this easy to update the obj...
-        self.obj_align.matrix_world = self.obj_align.matrix_world * new_mat
+        self.obj_align.matrix_world = self.obj_align.matrix_world @ new_mat
 
         self.obj_align.update_tag()
         context.scene.update()
             
     def invoke(self, context, event):
+        '''
+        Operator.invoke is used to initialize the operator from the context at the moment the operator is called
+        invoke() is typically used to assign properties which are then used by execute().
+        https://docs.blender.org/api/current/bpy.types.Operator.html
+        '''
         self.modal_state = 'WAITING'
  
         self.start_time = time.time()
@@ -654,11 +671,13 @@ class OBJECT_OT_align_pick_points(bpy.types.Operator):
         self.align_msg = 'Select 3 or more points'
         
         obj1_name = context.selected_objects[0].name
-        obj2_name = [obj for obj in context.selected_objects if obj != \
-                     context.selected_objects][0].name
+        #obj2_name = [obj for obj in context.selected_objects if obj != \
+                     #context.selected_objects][0].name
+
+        obj2_name = context.selected_objects[1].name
         
-        for ob in context.scene.collection.objects:
-            ob.select_set(status=False)
+        #for ob in context.scene.collection.objects:
+            #ob.select_set(status=False)
         
         context.view_layer.objects.active = None
         
@@ -738,4 +757,10 @@ if __name__ == "__main__":
 
 #command to add to running addon:
 #cp /mnt/linuxdisk/Dropbox/Tuan/Patran/skullremodelling/blenderscripts/alignment/my_alignment/__init__.py ~/.config/blender/2.80/scripts/addons/my_alignment/
+
+#Ref
 #https://b3d.interplanety.org/en/porting-add-on-from-blender-2-7-to-blender-2-8/
+#https://blog.michelanders.nl/search/label/upgrade
+#run command:
+#blender28 --python /mnt/linuxdisk/Dropbox/Tuan/Patran/skullremodelling/blenderscripts/alignment/my_alignment/loadscript.py
+
