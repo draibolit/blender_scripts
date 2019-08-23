@@ -1,0 +1,3 @@
+[submodule "blfuncs"]
+	path = blfuncs
+	url = git@github.com:draibolit/blfuncs
