@@ -3,7 +3,7 @@
 temp*
 *.zip
 pythonenv/
-*.blend
+*.blend*
 *.swp
 descript*
 test*
